@@ -1,0 +1,3 @@
+[submodule "labsheets"]
+	path = labsheets
+	url = git@github.com:COMSM0018-Applied-Deep-Learning/labsheets.git
