@@ -48,15 +48,12 @@ optimiser = tf.train.GradientDescentOptimizer(0.01).minimize(cost)
 
 sess.run(tf.global_variables_initializer())
 
-for epoch in range(10000):
-  sess.run([optimiser], feed_dict={x: train_x, y: train_y}) 
-
-out = sess.run(prediction, feed_dict={x: test_x, y: test_y}).tolist()
-correct = 0
-
 groundTruth = np.argmax(test_y.values, axis=1)
 
-predictions = np.argmax(out, axis=1)
-
-correct = np.sum(np.array(groundTruth == predictions, dtype=float))
-print("%d%%" % (correct * 100 / len(groundTruth)))
+for epoch in range(1200):
+  sess.run([optimiser], feed_dict={x: train_x, y: train_y})
+  if epoch % 10 == 0:
+    out = sess.run(prediction, feed_dict={x: test_x, y: test_y}).tolist()
+    predictions = np.argmax(out, axis=1)
+    correct = np.sum(np.array(groundTruth == predictions, dtype=float))
+    print("Accuracy of Perceptron at epoch %d is %d%%" % (epoch, correct * 100 / len(groundTruth)))
