@@ -62,17 +62,21 @@ for idx, currentLayerSize in enumerate(layerSizes):
 cost = tf.losses.softmax_cross_entropy(onehot_labels=y, logits=prediction, scope="Cost_Function")
 
 # Optimise using Adagrad
-optimiser = tf.train.AdagradOptimizer(0.01).minimize(cost)
-
-sess.run(tf.global_variables_initializer())
+optimiser = tf.train.AdagradOptimizer(0.1).minimize(cost)
 
 groundTruth = np.argmax(test_y.values, axis=1)
+
+acc, acc_op = tf.metrics.accuracy(labels=tf.argmax(y, axis=1), predictions=tf.argmax(prediction, axis=1))
+
+sess.run(tf.global_variables_initializer())
+sess.run(tf.local_variables_initializer())
 
 # Do the training
 for epoch in range(3000):
   sess.run([optimiser], feed_dict={x: train_x, y: train_y})
   if epoch % 100 == 0:
-    out = sess.run(prediction, feed_dict={x: test_x, y: test_y}).tolist()
-    predictions = np.argmax(out, axis=1)
-    correct = np.sum(np.array(groundTruth == predictions, dtype=float))
-    print("Accuracy of my first dnn at epoch %d is %d%%" % (epoch, correct * 100 / len(groundTruth)))
+    accuracy = sess.run(acc_op, feed_dict={x: test_x, y: test_y})
+    print("Accuracy of my first dnn at epoch %d is %f%%" % (epoch, accuracy * 100))
+
+accuracy = sess.run(acc_op, feed_dict={x: test_x, y: test_y})
+print("Accuracy of my first dnn at end is %f%%" % (accuracy * 100))
