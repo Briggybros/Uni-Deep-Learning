@@ -1,0 +1,1 @@
+ssh bluecrystal -L 6006:$1:$2
