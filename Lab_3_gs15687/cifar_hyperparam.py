@@ -87,8 +87,11 @@ def deepnn(x):
         b_conv1 = bias_variable([32])
         Z1 = tf.nn.conv2d(x_image, W_conv1, strides=[1, 1, 1, 1], padding='SAME', name='convolution')
         Z1_mean, Z1_variance = tf.nn.moments(Z1, [0, 1])
-        Z1_hat = (Z1 - Z1_mean) / sqrt(Z1_variance + 1e-4)
-        h_conv1 = tf.nn.relu(Z1 + b_conv1)
+        Z1_hat = tf.divide(tf.subtract(Z1, Z1_mean), tf.sqrt(Z1_variance + 1e-4))
+        gamma1 = tf.Variable(tf.ones([32]))
+        beta1 = tf.Variable(tf.ones([32]))
+        BN1 = gamma1 * Z1_hat + beta1
+        h_conv1 = tf.nn.relu(BN1)
 
         # Pooling layer - downsamples by 2X.
         h_pool1 = tf.nn.max_pool(h_conv1, ksize=[1, 2, 2, 1],
@@ -96,7 +99,13 @@ def deepnn(x):
 
         W_conv2 = weight_variable([5, 5, 32, 64])
         b_conv2 = bias_variable([64])
-        h_conv2 = tf.nn.relu(tf.nn.conv2d(h_pool1, W_conv2, strides=[1,1,1,1], padding='SAME', name='convolution') + b_conv2)
+        Z2 = tf.nn.conv2d(h_pool1, W_conv2, strides=[1,1,1,1], padding='SAME', name='convolution') + b_conv2
+        Z2_mean, Z2_variance = tf.nn.moments(Z2, [0,1])
+        Z2_hat = tf.divide(tf.subtract(Z2, Z2_mean), tf.sqrt(Z2_variance + 1e-4))
+        gamma2 = tf.Variable(tf.ones([64]))
+        beta2 = tf.Variable(tf.ones([64]))
+        BN2 = gamma2 * Z2_hat + beta2
+        h_conv2 = tf.nn.relu(BN2)
 
         h_pool2 = tf.nn.max_pool(h_conv2, ksize=[1,2,2,1], strides=[1,2,2,1], padding='SAME', name='pooling')
 
