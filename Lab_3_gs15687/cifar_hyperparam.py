@@ -36,8 +36,8 @@ tf.app.flags.DEFINE_integer('save-model', 1000,
                             'Number of steps between model saves (default: %(default)d)')
 
 # Optimisation hyperparameters
-tf.app.flags.DEFINE_integer('batch-size', 128, 'Number of examples per mini-batch (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning-rate', 1e-4, 'Learning rate (default: %(default)d)')
+tf.app.flags.DEFINE_integer('batch-size', 256, 'Number of examples per mini-batch (default: %(default)d)')
+tf.app.flags.DEFINE_float('learning-rate', 1e-3, 'Learning rate (default: %(default)d)')
 tf.app.flags.DEFINE_integer('img-width', 32, 'Image width (default: %(default)d)')
 tf.app.flags.DEFINE_integer('img-height', 32, 'Image height (default: %(default)d)')
 tf.app.flags.DEFINE_integer('img-channels', 3, 'Image channels (default: %(default)d)')
@@ -47,7 +47,7 @@ tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
 
 
 run_log_dir = os.path.join(FLAGS.log_dir,
-                           'exp_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size,
+                           'exp_BN_bs_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size,
                                                         lr=FLAGS.learning_rate))
 
 def weight_variable(shape):
@@ -85,7 +85,10 @@ def deepnn(x):
     with tf.variable_scope('Conv_1'):
         W_conv1 = weight_variable([5, 5, FLAGS.img_channels, 32])
         b_conv1 = bias_variable([32])
-        h_conv1 = tf.nn.relu(tf.nn.conv2d(x_image, W_conv1, strides=[1, 1, 1, 1], padding='SAME', name='convolution') + b_conv1)
+        Z1 = tf.nn.conv2d(x_image, W_conv1, strides=[1, 1, 1, 1], padding='SAME', name='convolution')
+        Z1_mean, Z1_variance = tf.nn.moments(Z1, [0, 1])
+        Z1_hat = (Z1 - Z1_mean) / sqrt(Z1_variance + 1e-4)
+        h_conv1 = tf.nn.relu(Z1 + b_conv1)
 
         # Pooling layer - downsamples by 2X.
         h_pool1 = tf.nn.max_pool(h_conv1, ksize=[1, 2, 2, 1],
@@ -134,7 +137,8 @@ def main(_):
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv))
     
     # Define your AdamOptimiser, using FLAGS.learning_rate to minimixe the loss function
-    optimiser = tf.train.AdamOptimizer(FLAGS.learning_rate, name="Adam").minimize(cross_entropy)
+    decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, tf.Variable(0, trainable=False), 1000, 0.8)
+    optimiser = tf.train.AdamOptimizer(decayed_learning_rate, name="Adam").minimize(cross_entropy)
 
     # calculate the prediction and the accuracy
     accuracy, acc_op = tf.metrics.accuracy(labels=tf.argmax(y_, axis=1), predictions=tf.argmax(y_conv, axis=1))

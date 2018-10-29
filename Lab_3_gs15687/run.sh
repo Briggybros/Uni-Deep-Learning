@@ -6,8 +6,7 @@ let ipnport=($UID-6025)%65274
 
 ipnip=$(hostname -i)
 
-echo "Copy this as the parameter from tensorboard.sh locally"
-echo "$ipnip:$ipnport"
+echo "./tensorboard $ipnip:$ipnport"
 
 tensorboard --logdir=logs/ --port=$ipnport > /dev/null 2> /dev/null &
 
