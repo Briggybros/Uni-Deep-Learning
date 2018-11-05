@@ -1,15 +1,3 @@
-############################################################
-#                                                          #
-#  Code for Lab 1: Intro to TensorFlow and Blue Crystal 4  #
-#                                                          #
-############################################################
-
-'''Based on TensorFLow's tutorial: A deep MNIST classifier using convolutional layers.
-
-See extensive documentation at
-https://www.tensorflow.org/get_started/mnist/pros
-'''
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function

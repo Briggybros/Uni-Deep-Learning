@@ -1,10 +1,3 @@
-############################################################
-#                                                          #
-#  Code for Lab 1: Your First Fully Connected Layer  #
-#                                                          #
-############################################################
-
-
 import tensorflow as tf
 import os
 import os.path
