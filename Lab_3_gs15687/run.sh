@@ -6,7 +6,7 @@ let ipnport=($UID-6025)%65274
 
 ipnip=$(hostname -i)
 
-echo "./tensorboard $ipnip:$ipnport"
+echo "./tensorboard.sh $ipnip:$ipnport"
 
 tensorboard --logdir=logs/ --port=$ipnport > /dev/null 2> /dev/null &
 
