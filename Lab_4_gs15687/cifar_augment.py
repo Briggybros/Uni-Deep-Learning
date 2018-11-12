@@ -25,7 +25,7 @@ tf.app.flags.DEFINE_integer('save-model', 1000,
 
 # Optimisation hyperparameters
 tf.app.flags.DEFINE_integer('batch-size', 256, 'Number of examples per mini-batch (default: %(default)d)')
-tf.app.flags.DEFINE_float('learning-rate', 1e-3, 'Learning rate (default: %(default)d)')
+tf.app.flags.DEFINE_float('learning-rate', 1e-4, 'Learning rate (default: %(default)d)')
 tf.app.flags.DEFINE_integer('img-width', 32, 'Image width (default: %(default)d)')
 tf.app.flags.DEFINE_integer('img-height', 32, 'Image height (default: %(default)d)')
 tf.app.flags.DEFINE_integer('img-channels', 3, 'Image channels (default: %(default)d)')
@@ -35,7 +35,7 @@ tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
 
 
 run_log_dir = os.path.join(FLAGS.log_dir,
-                           'exp_BN_bs_{bs}_lr_{lr}_conv_bias'.format(bs=FLAGS.batch_size,
+                           'exp_BN_bs_{bs}_lr_{lr}_aug_flip_brightness'.format(bs=FLAGS.batch_size,
                                                         lr=FLAGS.learning_rate))
 
 def weight_variable(shape):
@@ -48,7 +48,7 @@ def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial, name='biases')
 
-def deepnn(x):
+def deepnn(x, train):
     """deepnn builds the graph for a deep net for classifying CIFAR10 images.
 
   Args:
@@ -67,6 +67,9 @@ def deepnn(x):
 
     x_image = tf.reshape(x, [-1, FLAGS.img_width, FLAGS.img_height, FLAGS.img_channels])
 
+    x_image = tf.cond(train, lambda: tf.map_fn(tf.image.random_flip_left_right, x_image), lambda: x_image)
+    x_image = tf.cond(train, lambda: tf.map_fn(lambda x: tf.image.random_brightness(x, 0.5), x_image), lambda: x_image)
+
     img_summary = tf.summary.image('Input_images', x_image)
 
     # First convolutional layer - maps one image to 32 feature maps.
@@ -79,7 +82,7 @@ def deepnn(x):
             use_bias=False,
             name='conv1'
         )
-        conv1_bn = tf.nn.relu(tf.layers.batch_normalization(conv1))
+        conv1_bn = tf.nn.relu(tf.layers.batch_normalization(conv1, training=train))
         pool1 = tf.layers.max_pooling2d(
             inputs=conv1_bn,
             pool_size=[2, 2],
@@ -95,7 +98,7 @@ def deepnn(x):
             use_bias=False,
             name='conv2'
         )
-        conv2_bn = tf.nn.relu(tf.layers.batch_normalization(conv2))
+        conv2_bn = tf.nn.relu(tf.layers.batch_normalization(conv2, training=train))
         pool2 = tf.layers.max_pooling2d(
             inputs=conv2_bn,
             pool_size=[2, 2],
@@ -143,9 +146,11 @@ def main(_):
         x = tf.placeholder(tf.float32, [None, FLAGS.img_width * FLAGS.img_height * FLAGS.img_channels])
         # Define loss and optimizer
         y_ = tf.placeholder(tf.float32, [None, FLAGS.num_classes])
+        # Whether model is training
+        train = tf.placeholder(tf.bool, [])
 
     # Build the graph for the deep net
-    y_conv, img_summary = deepnn(x)
+    y_conv, img_summary = deepnn(x, train)
 
     # Define your loss function - softmax_cross_entropy
     with tf.variable_scope('x_entropy'):
@@ -153,7 +158,9 @@ def main(_):
     
     # Define your AdamOptimiser, using FLAGS.learning_rate to minimixe the loss function
     decayed_learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, tf.Variable(0, trainable=False), 1000, 0.8)
-    optimiser = tf.train.AdamOptimizer(decayed_learning_rate, name="Adam").minimize(cross_entropy)
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    with tf.control_dependencies(update_ops):
+        optimiser = tf.train.AdamOptimizer(decayed_learning_rate, name="Adam").minimize(cross_entropy)
 
     # calculate the prediction and the accuracy
     accuracy, acc_op = tf.metrics.accuracy(labels=tf.argmax(y_, axis=1), predictions=tf.argmax(y_conv, axis=1))
@@ -182,7 +189,7 @@ def main(_):
             (trainImages, trainLabels) = cifar.getTrainBatch()
             (testImages, testLabels) = cifar.getTestBatch()
             
-            _, summary_str = sess.run([optimiser, training_summary], feed_dict={x: trainImages, y_: trainLabels})
+            _, summary_str = sess.run([optimiser, training_summary], feed_dict={x: trainImages, y_: trainLabels, train: True})
 
             
             if step % (FLAGS.log_frequency + 1) == 0:
@@ -190,7 +197,7 @@ def main(_):
 
             ## Validation: Monitoring accuracy using validation set
             if step % FLAGS.log_frequency == 0:
-                accuracy, summary_str = sess.run([acc_op, validation_summary], feed_dict={x: testImages, y_: testLabels})
+                accuracy, summary_str = sess.run([acc_op, validation_summary], feed_dict={x: testImages, y_: testLabels, train: False})
                 print('step %d, accuracy on validation batch: %g' % (step, accuracy))
                 summary_writer_validation.add_summary(summary_str, step)
 
@@ -210,7 +217,7 @@ def main(_):
         # don't loop back when we reach the end of the test set
         while evaluated_images != cifar.nTestSamples:
             (testImages, testLabels) = cifar.getTestBatch(allowSmallerBatches=True)
-            test_accuracy_temp, _ = sess.run([acc_op, test_summary], feed_dict={x: testImages, y_: testLabels})
+            test_accuracy_temp, _ = sess.run([acc_op, test_summary], feed_dict={x: testImages, y_: testLabels, train: False})
 
             batch_count = batch_count + 1
             test_accuracy = test_accuracy + test_accuracy_temp
