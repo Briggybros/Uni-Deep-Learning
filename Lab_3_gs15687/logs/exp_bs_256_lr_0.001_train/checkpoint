@@ -1,2 +1,0 @@
-model_checkpoint_path: "/mnt/storage/home/gs15687/Uni-Deep-Learning/Lab_3_gs15687/logs/exp_bs_256_lr_0.001_train/model.ckpt-9999"
-all_model_checkpoint_paths: "/mnt/storage/home/gs15687/Uni-Deep-Learning/Lab_3_gs15687/logs/exp_bs_256_lr_0.001_train/model.ckpt-9999"

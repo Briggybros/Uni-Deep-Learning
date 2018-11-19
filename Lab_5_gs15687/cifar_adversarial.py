@@ -44,7 +44,7 @@ tf.app.flags.DEFINE_string('log-dir', '{cwd}/logs/'.format(cwd=os.getcwd()),
 
 
 run_log_dir = os.path.join(FLAGS.log_dir,
-                           'Lab_5_{bs}_lr_{lr}'.format(bs=FLAGS.batch_size,
+                           'Lab_5_{bs}_lr_{lr}_adv'.format(bs=FLAGS.batch_size,
                                                         lr=FLAGS.learning_rate))
 
 def weight_variable(shape):
@@ -179,6 +179,7 @@ def main(_):
     
     # summaries for TensorBoard visualisation
     loss_summary = tf.summary.scalar('Loss', cross_entropy)
+    adv_loss_summary = tf.summary.scalar('Adversarial Loss', cross_entropy)
     acc_summary = tf.summary.scalar('Accuracy', accuracy)
     adv_acc_summary = tf.summary.scalar('Adv Accuracy', adv_accuracy)
     image_summary = tf.summary.image('Test Images', x_image)
@@ -189,11 +190,11 @@ def main(_):
     with tf.Session() as sess:
         with tf.variable_scope('model', reuse=True):
             fgsm = FastGradientMethod(model, sess=sess)
-            adv_test = fgsm.generate(x_image, eps=FLAGS.fgsm_eps, clip_min=0.0, clip_max=1.0)
+            adv_image_op = fgsm.generate(x_image, eps=FLAGS.fgsm_eps, clip_min=0.0, clip_max=1.0)
 
-        summary_writer = tf.summary.FileWriter(run_log_dir + '_train', sess.graph, flush_secs=5)
+        summary_writer_train = tf.summary.FileWriter(run_log_dir + '_train', sess.graph, flush_secs=5)
         summary_writer_validation = tf.summary.FileWriter(run_log_dir + '_validate', sess.graph, flush_secs=5)
-        summary_writer_adversarial = tf.summary.FileWriter(run_log_dir + "_adversarial", sess.graph, flush_secs=5)
+        summary_writer_adversarial = tf.summary.FileWriter(run_log_dir + '_adversarial', sess.graph, flush_secs=5)
         summary_writer_images = tf.summary.FileWriter(run_log_dir + '_images', sess.graph, flush_secs=5)
         summary_writer_images_adversarial = tf.summary.FileWriter(run_log_dir + '_images_adversarial', sess.graph, flush_secs=5)
 
@@ -203,19 +204,21 @@ def main(_):
         # Training and validation
         for step in range(FLAGS.max_steps):
             # Training: Backpropagation using train set
-            (trainImages, trainLabels) = cifar.getTrainBatch()
-            (testImages, testLabels) = cifar.getTestBatch()
+            (train_images, train_labels) = cifar.getTrainBatch()
+            (test_images, test_labels) = cifar.getTestBatch()
             
-            _, summary_str = sess.run([optimiser, loss_summary], feed_dict={x: trainImages, y_: trainLabels, train: True})
+            _, summary_str, train_images_adv = sess.run([optimiser, loss_summary, adv_image_op], feed_dict={x: train_images, y_: train_labels, train: True})
+            _, summary_str_adv = sess.run([optimiser, adv_loss_summary], feed_dict={x_image: train_images_adv, y_: train_labels, train: True})
 
             
             if step % (FLAGS.log_frequency + 1) == 0:
-                summary_writer.add_summary(summary_str, step)
+                summary_writer_train.add_summary(summary_str, step)
+                summary_writer_train.add_summary(summary_str_adv, step)
 
             ## Validation: Monitoring accuracy using validation set
             if step % FLAGS.log_frequency == 0:
-                accuracy, summary_str, image_str, adv_images = sess.run([acc_op, acc_summary, image_summary, adv_test], feed_dict={x: testImages, y_: testLabels, train: False})
-                adv_accuracy, adv_summary_str, adv_image_str = sess.run([adv_acc_op, adv_acc_summary, image_summary], feed_dict={x_image: adv_images, y_: testLabels, train: False})
+                accuracy, summary_str, image_str, test_images_adv = sess.run([acc_op, acc_summary, image_summary, adv_image_op], feed_dict={x: test_images, y_: test_labels, train: False})
+                adv_accuracy, adv_summary_str, adv_image_str = sess.run([adv_acc_op, adv_acc_summary, image_summary], feed_dict={x_image: test_images_adv, y_: test_labels, train: False})
                 print('step %d, accuracy on validation batch: %g' % (step, accuracy))
                 summary_writer_validation.add_summary(summary_str, step)
                 summary_writer_images.add_summary(image_str)
@@ -239,7 +242,7 @@ def main(_):
         # don't loop back when we reach the end of the test set
         while evaluated_images != cifar.nTestSamples:
             (testImages, testLabels) = cifar.getTestBatch(allowSmallerBatches=True)
-            test_accuracy_temp, _, adv_images = sess.run([acc_op, acc_summary, adv_test], feed_dict={x: testImages, y_: testLabels, train: False})
+            test_accuracy_temp, _, adv_images = sess.run([acc_op, acc_summary, adv_image_op], feed_dict={x: testImages, y_: testLabels, train: False})
             adv_test_accuracy_temp = sess.run(adv_acc_op, feed_dict={x_image: adv_images, y_: testLabels, train: False})
 
             batch_count = batch_count + 1
